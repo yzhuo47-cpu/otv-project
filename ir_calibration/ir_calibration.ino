@@ -1,0 +1,192 @@
+// ir_calibration.ino - TCRT5000 calibration: orzo vs rocks (MS5 sub-task 9)
+#include <Arduino.h>
+
+// ---- Settings ----
+const int IR_PIN          = A0;   // sensor output
+const int NUM_SAMPLES     = 25;   // reads averaged into one reading (smooths out noise)
+const int SAMPLE_DELAY_MS = 4;    // pause between those reads
+const int MIN_SEPARATION  = 40;   // minimum difference between the two averages (safety margin)
+const int SPOTS           = 8;    // spots measured per material (rocks are uneven)
+const int MOVE_SECONDS    = 5;    // countdown before each reading (time to move the container)
+
+// ---- Calibration data ----
+int orzo[SPOTS], rocks[SPOTS];                                  // the 8 readings of each material
+bool haveOrzo = false, haveRocks = false, calibrated = false;   // which steps are done
+int refOrzo = 0, refRocks = 0;                                  // reference values (the averages)
+int testCount = 0;                                              // tests run so far
+
+// Read the sensor once (average of 25 reads)
+int irRead() {
+  long sum = 0;
+  for (int i = 0; i < NUM_SAMPLES; i++) {   // add up 25 reads
+    sum += analogRead(IR_PIN);
+    delay(SAMPLE_DELAY_MS);
+  }
+  return (int)(sum / NUM_SAMPLES);          // return their average
+}
+
+// Classify a reading: whichever average it is closer to
+bool isPlantable(int reading) {
+  return abs(reading - refOrzo) < abs(reading - refRocks);   // true = orzo, false = rocks (a tie counts as rocks)
+}
+
+// Average, lowest and highest of the 8 readings
+int average(const int* v) { long s = 0; for (int i = 0; i < SPOTS; i++) s += v[i]; return (int)((s + SPOTS / 2) / SPOTS); }
+int lowest(const int* v)  { int m = v[0]; for (int i = 1; i < SPOTS; i++) if (v[i] < m) m = v[i]; return m; }
+int highest(const int* v) { int m = v[0]; for (int i = 1; i < SPOTS; i++) if (v[i] > m) m = v[i]; return m; }
+
+// Throw away leftover typed characters
+void clearInput() { delay(20); while (Serial.available()) Serial.read(); }
+
+// Measure one material at 8 spots, with a countdown before each reading
+void measure(int* v, const __FlashStringHelper* name) {
+  Serial.println();
+  Serial.print(F("Measuring "));
+  Serial.println(name);
+  for (int i = 0; i < SPOTS; i++) {               // one pass per spot
+    Serial.print(F("  spot "));
+    Serial.print(i + 1);
+    Serial.print(F(": "));
+    for (int s = MOVE_SECONDS; s > 0; s--) {      // countdown: 5..4..3..2..1..
+      Serial.print(s);
+      Serial.print(F(".. "));
+      delay(1000);
+    }
+    v[i] = irRead();                              // read and save
+    Serial.println(v[i]);
+  }
+  clearInput();                                   // ignore keys pressed while measuring
+}
+
+// Print one row of the result table
+void printRow(const __FlashStringHelper* name, const int* v, int avg) {
+  Serial.print(name);
+  Serial.print('\t');  Serial.print(avg);         // average
+  Serial.print('\t');  Serial.print(lowest(v));   // min
+  Serial.print('\t');  Serial.println(highest(v));// max
+}
+
+// Compute the averages, check the calibration and print the result
+void report() {
+  // Reference values = the two averages
+  refOrzo  = average(orzo);
+  refRocks = average(rocks);
+  bool orzoHigher = refOrzo > refRocks;           // which one reads higher (the rule works either way)
+  int  difference = abs(refOrzo - refRocks);
+
+  // Classify all 16 readings with the rule and count the correct ones
+  int  right = 0;
+  for (int i = 0; i < SPOTS; i++) {
+    if (isPlantable(orzo[i]))   right++;
+    if (!isPlantable(rocks[i])) right++;
+  }
+
+  // Pass = all 16 correct (the rule works on this data)
+  //    AND averages at least 40 apart (margin so new readings work too)
+  calibrated = difference >= MIN_SEPARATION && right == 2 * SPOTS;
+  testCount = 0;                                  // new references: restart test numbering
+
+  // Result table
+  Serial.println();
+  Serial.println(F("=== RESULT (0-1023) ==="));
+  Serial.println(F("\taverage\tmin\tmax"));
+  printRow(F("orzo"),  orzo,  refOrzo);
+  printRow(F("rocks"), rocks, refRocks);
+
+  // The two checks
+  Serial.print(F("Difference of averages: "));
+  Serial.print(difference);
+  Serial.print(F("   (need at least "));
+  Serial.print(MIN_SEPARATION);
+  Serial.println(')');
+  Serial.print(F("Readings classified correctly: "));
+  Serial.print(right);
+  Serial.print('/');
+  Serial.println(2 * SPOTS);
+
+  // Dividing value = halfway between the two averages
+  Serial.print(F("Dividing value: "));
+  Serial.print((refOrzo + refRocks) / 2.0, 1);
+  Serial.println(orzoHigher ? F("  (above = orzo, below = rocks)") : F("  (below = orzo, above = rocks)"));
+  Serial.println();
+
+  // Final verdict
+  if (calibrated) {
+    Serial.println(F("-> CALIBRATED. Type t to test once, v for live readings."));
+  } else {
+    // Usual causes: sensor too high (works best within ~1.5 cm) or room light
+    Serial.println(F("-> NOT RELIABLE. Lower the sensor, shade it from room light,"));
+    Serial.println(F("   check it points straight down, then measure again (p and n)."));
+  }
+}
+
+// Take one reading and print the verdict (like the robot stopping over a plot)
+void testOnce() {
+  if (!calibrated) {                              // no valid references yet
+    Serial.println(F("Not calibrated yet - measure with p and n first."));
+    return;
+  }
+  int r = irRead();                               // one reading
+  testCount++;
+  Serial.print(F("Test "));
+  Serial.print(testCount);
+  Serial.print(F(": reading "));
+  Serial.print(r);
+  Serial.println(isPlantable(r) ? F("  -> PLANTABLE (orzo)") : F("  -> NON-PLANTABLE (rocks)"));   // verdict
+}
+
+// Print readings continuously until a key is pressed
+void live() {
+  Serial.println();
+  Serial.println(calibrated ? F("Live readings - any key + Enter stops:")
+                            : F("Live RAW readings (not calibrated) - any key + Enter stops:"));
+  while (!Serial.available()) {                   // repeat until a key is pressed
+    int r = irRead();
+    Serial.print(F("  "));
+    Serial.print(r);
+    if (calibrated) Serial.print(isPlantable(r) ? F("\tPLANTABLE (orzo)") : F("\tNON-PLANTABLE (rocks)"));   // verdict only after calibration
+    Serial.println();
+    delay(300);                                   // 2-3 readings per second
+  }
+  clearInput();
+  Serial.println(F("Stopped."));
+}
+
+// Print the command list
+void help() {
+  Serial.println();
+  Serial.println(F("=== TCRT5000 calibration: orzo vs rocks ==="));
+  Serial.println(F("Keep the sensor at the IR-arm height, pointing straight down."));
+  Serial.println(F(" p : measure ORZO  (8 spots - move during 5..2, hold still at 1)"));
+  Serial.println(F(" n : measure ROCKS (8 spots)"));
+  Serial.println(F(" t : test once - one reading, one verdict"));
+  Serial.println(F(" v : live readings (any key + Enter stops)"));
+  Serial.println(F("The result prints by itself once both are measured."));
+}
+
+// Start serial and print the command list
+void setup() {
+  Serial.begin(115200);                   // set the Serial Monitor to 115200 baud
+  while (!Serial && millis() < 3000) {}   // wait briefly for the Serial Monitor (R4)
+  pinMode(IR_PIN, INPUT);                 // sensor pin as input
+  help();                                 // show the commands
+}
+
+// Wait for a command letter and run it
+void loop() {
+  if (!Serial.available()) return;              // nothing typed yet
+  char c = Serial.read();                       // first letter = the command
+  clearInput();                                 // ignore the rest of the line
+  if (c >= 'A' && c <= 'Z') c += 'a' - 'A';     // accept capitals
+  if (c == 'p')      { measure(orzo, F("ORZO"));   haveOrzo = true; }   // p: measure orzo
+  else if (c == 'n') { measure(rocks, F("ROCKS")); haveRocks = true; }  // n: measure rocks
+  else if (c == 't') { testOnce(); return; }                           // t: test once
+  else if (c == 'v') { live(); return; }                               // v: live readings
+  else if (c == '\n' || c == '\r' || c == ' ') return;                 // empty line: do nothing
+  else { help(); return; }                                             // anything else: help
+
+  // Show the result once both materials are measured
+  if (haveOrzo && haveRocks) report();
+  else Serial.println(haveOrzo ? F("Now put rocks under the sensor and type n.")
+                               : F("Now put orzo under the sensor and type p."));
+}
