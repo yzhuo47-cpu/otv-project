@@ -1,7 +1,7 @@
 // Ultrasonic_Calibration.ino - HC-SR04 calibration (ENES100 MS5 sub-task 8)
 // Arduino UNO (R3 or R4 WiFi), Serial Monitor at 9600 baud. How to use: README.md
 #include <Arduino.h>
-// Test
+
 // Sensor pins (placeholders - change to the OTV's pin map)
 const uint8_t TRIG_PIN = 2;           // Arduino -> sensor: start a measurement
 const uint8_t ECHO_PIN = 4;           // sensor -> Arduino: echo time
