@@ -1,1 +1,108 @@
 
+// ===== Turning (MS5 sub-task 2) =====
+// Three 90-degree turns in a row, in place, using the Vision System theta.
+// Each turn is relative to the heading the OTV has when the turn starts.
+#include "Enes100.h"
+
+// ----- Pins -----
+const int LEFT_A  = 5;
+const int LEFT_B  = 6;
+const int RIGHT_A = 3;
+const int RIGHT_B = 11;
+
+const int WIFI_TX   = 8;
+const int WIFI_RX   = 12;
+const int MARKER_ID = 0;
+const int ROOM      = 1116;
+
+// ----- Settings -----
+const bool  TURN_LEFT    = true;    // true = counter-clockwise, false = clockwise
+const int   NUM_TURNS    = 3;
+const float TOLERANCE    = 0.05;    // radians (~3 degrees)
+const float KP           = 150.0;   // PWM per radian of error
+const int   TURN_PWM_MAX = 230;
+const int   TURN_PWM_MIN = 140;     // below this the chassis stalls
+const float PULSE_ZONE   = 0.35;    // inside this error (rad), turn in short pulses
+const int   PULSE_ON_MS  = 60;      // pulse length
+const int   PULSE_OFF_MS = 150;     // pause so the Vision System can catch up
+const unsigned long TURN_TIMEOUT_MS = 15000UL;
+
+void setSide(int pinA, int pinB, int speed) {
+  speed = constrain(speed, -255, 255);
+  if (speed > 0)      { analogWrite(pinA, speed);  digitalWrite(pinB, LOW); }
+  else if (speed < 0) { digitalWrite(pinA, LOW);   analogWrite(pinB, -speed); }
+  else                { digitalWrite(pinA, LOW);   digitalWrite(pinB, LOW); }
+}
+
+void drive(int left, int right) {
+  setSide(LEFT_A, LEFT_B, left);
+  setSide(RIGHT_A, RIGHT_B, right);
+}
+
+float wrapAngle(float a) {
+  while (a > PI)  a -= 2 * PI;
+  while (a < -PI) a += 2 * PI;
+  return a;
+}
+
+// Wait until the marker is seen, then return theta
+float readTheta() {
+  while (!Enes100.isVisible()) {
+    drive(0, 0);
+    delay(100);
+  }
+  return Enes100.getTheta();
+}
+
+void turn90() {
+  float delta  = TURN_LEFT ? PI / 2 : -PI / 2;
+  float target = wrapAngle(readTheta() + delta);
+  unsigned long t0 = millis();
+
+  while (millis() - t0 < TURN_TIMEOUT_MS) {
+    float error = wrapAngle(target - readTheta());
+
+    if (fabs(error) < TOLERANCE) {               // looks done: stop and re-check once settled
+      drive(0, 0);
+      delay(300);
+      if (fabs(wrapAngle(target - readTheta())) < TOLERANCE) break;
+      continue;
+    }
+
+    int pwm = constrain((int)(KP * fabs(error)), TURN_PWM_MIN, TURN_PWM_MAX);
+    int dir = (error > 0) ? 1 : -1;              // error > 0 -> turn left (CCW)
+    drive(-dir * pwm, dir * pwm);                // left side back, right side forward = CCW
+
+    if (fabs(error) < PULSE_ZONE) {              // close to target: short pulses
+      delay(PULSE_ON_MS);
+      drive(0, 0);
+      delay(PULSE_OFF_MS);
+    } else {
+      delay(30);
+    }
+  }
+  drive(0, 0);
+}
+
+void setup() {
+  pinMode(LEFT_A, OUTPUT);
+  pinMode(LEFT_B, OUTPUT);
+  pinMode(RIGHT_A, OUTPUT);
+  pinMode(RIGHT_B, OUTPUT);
+  drive(0, 0);
+
+  Enes100.begin("The Harvesters", SEED, MARKER_ID, ROOM, WIFI_TX, WIFI_RX);
+  Enes100.println("Turning test start");
+
+  for (int i = 1; i <= NUM_TURNS; i++) {
+    delay(2000);
+    turn90();
+    Enes100.print("Turn ");
+    Enes100.print(i);
+    Enes100.println(" done");
+  }
+}
+
+void loop() {
+  // Nothing to do after the 3 turns
+}
