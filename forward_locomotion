@@ -1,1 +1,102 @@
+// ===== Forward locomotion (MS5 sub-task 1) =====
+// Drive straight ~3.4 m from the landing zone in under 3 minutes.
+// Uses the Vision System heading to hold a straight line.
+// Set USE_VISION = false for a timed, open-loop run (no WiFi needed).
+#include "Enes100.h"
 
+// ----- Pins -----
+const int LEFT_A  = 5;    // Left  L298N (forward pin)
+const int LEFT_B  = 6;    //             (reverse pin)
+const int RIGHT_A = 3;    // Right L298N (forward pin)
+const int RIGHT_B = 11;   //             (reverse pin)
+
+const int WIFI_TX   = 8;
+const int WIFI_RX   = 12;
+const int MARKER_ID = 0;
+const int ROOM      = 1116;
+
+// ----- Settings -----
+const bool  USE_VISION   = true;
+const float DISTANCE_M   = 3.4;                // distance to travel
+const unsigned long TIME_LIMIT_MS = 170000UL;  // safety stop (< 3 min)
+const int   BASE_PWM     = 215;                // leaves headroom to steer; raise if it stalls
+const float KP           = 150.0;              // PWM per radian of heading error
+const int   MAX_CORR     = 40;                 // max steering correction (PWM)
+const float OPEN_LOOP_SPEED_MPS = 0.040;       // CALIBRATE: measured speed at BASE_PWM
+
+// Drive one side: positive = forward, negative = backward, 0 = stop
+void setSide(int pinA, int pinB, int speed) {
+  speed = constrain(speed, -255, 255);
+  if (speed > 0)      { analogWrite(pinA, speed);  digitalWrite(pinB, LOW); }
+  else if (speed < 0) { digitalWrite(pinA, LOW);   analogWrite(pinB, -speed); }
+  else                { digitalWrite(pinA, LOW);   digitalWrite(pinB, LOW); }
+}
+
+void drive(int left, int right) {
+  setSide(LEFT_A, LEFT_B, left);
+  setSide(RIGHT_A, RIGHT_B, right);
+}
+
+// Keep an angle between -PI and PI (same range as the Vision System's theta)
+float wrapAngle(float a) {
+  while (a > PI)  a -= 2 * PI;
+  while (a < -PI) a += 2 * PI;
+  return a;
+}
+
+void driveWithVision() {
+  while (!Enes100.isVisible()) delay(100);       // wait for the marker
+  float x0 = Enes100.getX();
+  float y0 = Enes100.getY();
+  float heading = Enes100.getTheta();            // hold the starting heading
+  unsigned long t0 = millis();
+
+  while (millis() - t0 < TIME_LIMIT_MS) {
+    if (!Enes100.isVisible()) {                  // marker hidden: keep going straight
+      drive(BASE_PWM, BASE_PWM);
+      delay(50);
+      continue;
+    }
+    float dx = Enes100.getX() - x0;
+    float dy = Enes100.getY() - y0;
+    if (sqrt(dx * dx + dy * dy) >= DISTANCE_M) break;   // arrived
+
+    // error > 0 means the OTV points right of the line -> turn left
+    float error = wrapAngle(heading - Enes100.getTheta());
+    int corr = constrain((int)(KP * error), -MAX_CORR, MAX_CORR);
+    drive(BASE_PWM - corr, BASE_PWM + corr);     // left slower, right faster = turn left
+    delay(30);
+  }
+  drive(0, 0);
+}
+
+void driveTimed() {
+  unsigned long runMs = (unsigned long)(1000.0 * DISTANCE_M / OPEN_LOOP_SPEED_MPS);
+  runMs = min(runMs, TIME_LIMIT_MS);
+  drive(BASE_PWM, BASE_PWM);
+  delay(runMs);
+  drive(0, 0);
+}
+
+void setup() {
+  pinMode(LEFT_A, OUTPUT);
+  pinMode(LEFT_B, OUTPUT);
+  pinMode(RIGHT_A, OUTPUT);
+  pinMode(RIGHT_B, OUTPUT);
+  drive(0, 0);
+
+  if (USE_VISION) {
+    Enes100.begin("The Harvesters", SEED, MARKER_ID, ROOM, WIFI_TX, WIFI_RX);
+    Enes100.println("Forward locomotion start");
+  }
+  delay(3000);                                   // time to step back
+
+  if (USE_VISION) driveWithVision();
+  else            driveTimed();
+
+  if (USE_VISION) Enes100.println("Forward locomotion done");
+}
+
+void loop() {
+  // Nothing to do after the run
+}
