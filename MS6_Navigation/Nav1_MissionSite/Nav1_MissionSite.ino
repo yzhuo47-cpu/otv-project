@@ -42,14 +42,14 @@ void setup() {
   bool siteBelow = (y > 1.0);
   float missionY = siteBelow ? MISSION_Y_BOTTOM : MISSION_Y_TOP;
   float parkY = siteBelow ? missionY + SIDE_DIST : missionY - SIDE_DIST;
-  Enes100.println("Nav1: going to mission site");
+  Enes100.printf("Nav1: going to mission site");
 
   // 2. Drive to the parking spot
   goToPoint(MISSION_X, parkY, POINT_TOL);
 
   // 3. The arm is on the right: facing +x (0) points it down, facing -x (PI) points it up
   turnTo(siteBelow ? 0 : PI);
-  Enes100.println("Nav1: arrived at mission site");
+  Enes100.printf("Nav1: arrived at mission site");
 }
 
 void loop() {
