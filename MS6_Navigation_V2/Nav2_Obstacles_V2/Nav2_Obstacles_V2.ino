@@ -35,7 +35,7 @@ const float LANE_SHIFT = (ARM_REACH - HALF_WIDTH) / 2;
 const float CLEAR_CM = 60;       // gap check: column 2 is ~20 cm ahead if blocked; nothing within 60 cm = lane open
 const int REPORT_MS = 500;       // print the ultrasonic reading on the Vision System page at most this often
 const int PING_GAP_MS = 60;      // minimum time between two ultrasonic readings (HC-SR04 datasheet)
-const float SAFETY_CM = 6;       // backup emergency stop: something this close ahead -> stop and wait
+const float SAFETY_CM = 12;       // backup emergency stop: something this close ahead -> stop and wait
 
 // ===== L298N pins (same wiring as MS5) =====
 const int R_EN = 10, R_IN1 = 9, R_IN2 = 8;   // right motors: speed (PWM), direction, direction
@@ -67,7 +67,7 @@ void setup() {
   // Connect over the R4's built-in Wi-Fi (waits until connected), then wait until the camera sees our marker
   Enes100.begin("The Harvesters", SEED, MARKER_ID, ROOM);
   while (!readPose()) {}
-  Enes100.println("Nav2: start obstacles");
+  Enes100.printf("Nav2: start obstacles");
 
   readDistanceCM();   // first ultrasonic reading is printed before moving: shows whether the sensor works
 
@@ -92,7 +92,7 @@ void setup() {
     if (col[i] == 2) n2++;
   }
   if (n1 + n2 < 2) {   // the two boxes are always visible, so fewer hits means a sensor problem
-    Enes100.println("Nav2: saw fewer than 2 obstacles, check the ultrasonic");
+    Enes100.printf("Nav2: saw fewer than 2 obstacles, check the ultrasonic");
     return;
   }
 
@@ -116,7 +116,7 @@ void setup() {
     }
   }
   if (first < 0) {   // readings don't fit the arena rules: stop instead of guessing
-    Enes100.println("Nav2: no path found, check the ultrasonic");
+    Enes100.printf("Nav2: no path found, check the ultrasonic");
     return;
   }
 
@@ -128,10 +128,10 @@ void setup() {
   float crossX;
   if (second > first) crossX = (edge1 + TURN_R + face2 - armRoom) / 2;   // moving up: arm points forward
   else                crossX = (edge1 + armRoom + face2 - TURN_R) / 2;   // moving down: arm points back
-  if (face2 - edge1 < armRoom + TURN_R) Enes100.println("Nav2: WARNING gap too small for the arm");
+  if (face2 - edge1 < armRoom + TURN_R) Enes100.printf("Nav2: WARNING gap too small for the arm");
 
   // 6. Drive lane "first" to the gap, then move sideways to lane "second"
-  Enes100.println("Nav2: lane", first, "then", second);
+  Enes100.printf("Nav2: lane", first, "then", second);
   moveToY(laneY(first), SCAN_X);
   turnTo(0);
   driveLaneUntil(first, crossX);
@@ -143,20 +143,20 @@ void setup() {
   //    column 1 (then column 2 is open; a lane that might hide the rumbles is never tried).
   if (!clearAhead()) {
     int third = 3 - first - second;
-    Enes100.println("Nav2: lane", second, "is blocked at column 2");
-    if (col[third] != 1) { Enes100.println("Nav2: no safe lane left, stopping"); return; }
+    Enes100.printf("Nav2: lane", second, "is blocked at column 2");
+    if (col[third] != 1) { Enes100.printf("Nav2: no safe lane left, stopping"); return; }
     moveToY(laneY(third), crossX);
     turnTo(0);
-    if (!clearAhead()) { Enes100.println("Nav2: lane", third, "is blocked too, stopping"); return; }
+    if (!clearAhead()) { Enes100.printf("Nav2: lane", third, "is blocked too, stopping"); return; }
     second = third;
   }
 
   // 8. Column 2 is open ahead: drive to the finish line
-  Enes100.println("Nav2: lane", second, "is clear, going on");
+  Enes100.printf("Nav2: lane", second, "is clear, going on");
   driveLaneUntil(second, PAST_OBSTACLES_X);
 
   stopMotors();
-  Enes100.println("Nav2: past all obstacles");
+  Enes100.printf("Nav2: past all obstacles");
 }
 
 void loop() {
@@ -190,8 +190,8 @@ void scanLanes() {
     float d = median3(medianDistanceCM(), medianDistanceCM(), medianDistanceCM());
     hitX[i] = (d > 500) ? 99 : x + FRONT + d / 100.0;   // arena x of the hit = OTV x + sensor offset + distance
     // Print the raw distance too, so a sensor problem is easy to spot
-    if (d > 500) Enes100.println("Nav2: lane", i, "no echo");
-    else Enes100.println("Nav2: lane", i, "dist", d, "cm, hit at x =", hitX[i]);
+    if (d > 500) Enes100.printf("Nav2: lane", i, "no echo");
+    else Enes100.printf("Nav2: lane", i, "dist", d, "cm, hit at x =", hitX[i]);
   }
 }
 
@@ -253,8 +253,8 @@ float readDistanceCM() {
   static unsigned long lastReport = 0;
   if (!reported || millis() - lastReport >= REPORT_MS) {
     reported = true; lastReport = millis();
-    if (t == 0) Enes100.println("Nav2: ultrasonic no echo");
-    else Enes100.println("Nav2: ultrasonic", cm, "cm");
+    if (t == 0) Enes100.printf("Nav2: ultrasonic no echo");
+    else Enes100.printf("Nav2: ultrasonic", cm, "cm");
   }
   return cm;
 }
