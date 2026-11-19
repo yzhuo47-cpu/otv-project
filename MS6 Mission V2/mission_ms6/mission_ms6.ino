@@ -32,7 +32,7 @@ const int BUCKET_SCOOP = 150; // scoops substrate; the bean drops out the other 
 const int BUCKET_DUMP = 30;   // pours the scooped orzo back on top of the bean
 
 // IR, from our calibration: orzo reads about 19-21, rocks about 23-25
-const float IR_THRESHOLD = 21.5;   // below = orzo, above = rocks (exact middle would be 22)
+const float IR_THRESHOLD = 27;   // below = orzo, above = rocks (exact middle would be 22)
 const float IR_CHECK_ZONE = 0.5;   // this close to the threshold = too close to call: scan again
 
 // Movement
