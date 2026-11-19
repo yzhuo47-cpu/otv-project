@@ -1,0 +1,210 @@
+#include "Enes100.h"
+#include <Servo.h>
+
+// ===================== SETTINGS =====================
+
+// Which part to run (change, then upload again)
+// 1 = Front of the site: Mission II (plant seed) + Mission III (collect rocks)
+// 2 = Back of the site:  Mission I (read the two far plots + send the result)
+// 3 = Sensor Test Only:  Continuously print live IR sensor values over Wi-Fi
+const int MODE = 2;
+
+// Vision system (UNO R4 WiFi: Wi-Fi is built in)
+const int MARKER_ID = 147;  // number of the ArUco marker on top of the OTV
+const int ROOM = 1201;      // arena room: 1201 open lab
+
+// Motor pins (L298N driver)
+const int ENA = 10, IN1 = 9, IN2 = 8;   // right side: enable + direction
+const int ENB = 5,  IN3 = 7, IN4 = 6;   // left side:  enable + direction
+
+// Mission pins
+const int ARM_PIN = A1;     // upper servo: lifts / lowers the arm
+const int BUCKET_PIN = A2;  // lower servo: turns the bucket
+const int IR_PIN = A0;      // IR reflectance sensor (TCRT5000, analog AO pin)
+
+// Servo angles (0-180)
+const int ARM_UP = 75;        // 15 deg above touching: start position, safe to drive
+const int ARM_DOWN = 102;     // 12 deg below touching: digs about 2 cm
+const int BUCKET_HOLD = 90;   // bucket level: start position, holds the bean
+const int BUCKET_SCOOP = 150; // scoops substrate; the bean drops out the other side
+const int BUCKET_DUMP = 30;   // pours the scooped orzo back on top of the bean
+
+// IR, from our calibration: orzo reads about 19-21, rocks about 23-25
+const float IR_THRESHOLD = 21.5;   // below = orzo, above = rocks
+const float IR_CHECK_ZONE = 0.5;   // this close to the threshold = scan again
+
+// Movement
+const float PLOT_SPACING_CM = 8.4; // center-to-center distance of two plots
+
+// ====================================================
+
+Servo arm;
+Servo bucket;
+
+void setup() {
+  motorsOff();                // motors can't move by accident
+
+  arm.attach(ARM_PIN);
+  bucket.attach(BUCKET_PIN);
+
+  // Arm up, bucket level, before anything else moves
+  arm.write(ARM_UP);
+  bucket.write(BUCKET_HOLD);
+
+  // Connect to Vision System over Wi-Fi
+  Enes100.begin("The Harvesters", SEED, MARKER_ID, ROOM);
+
+  // IMPORTANT: Wait until Wi-Fi is actually connected so printouts aren't lost
+  while (!Enes100.isConnected()) {
+    delay(100);
+  }
+  Enes100.println("Wi-Fi Connected! Starting in 3s...");
+  delay(3000);                // time to take your hands away
+
+  if (MODE == 1) frontSide();
+  if (MODE == 2) missionOne();
+}
+
+void loop() {
+  // If MODE == 3, stream live IR measurements to the Vision System console
+  if (MODE == 3) {
+    float val = readIR();
+    String label = isOrzo(val) ? "ORZO" : "ROCKS";
+    Enes100.println("Live IR: " + String(val, 2) + " -> " + label);
+    delay(1000); // Wait 1s between prints so we don't flood the 8-message queue
+  }
+}
+
+// ================ MISSIONS ================
+
+void frontSide() {
+  Enes100.println("Running MODE 1 (Front Side)...");
+  missionTwo();              // plant the seed in the near-left plot
+  backUp(PLOT_SPACING_CM);   // move one plot: bucket now above the near-right plot
+  missionThree();            // collect rocks from the near-right plot
+  Enes100.println("MODE 1 complete.");
+}
+
+void missionOne() {
+  Enes100.println("Reading far-right plot...");
+  float rightIR = readPlot();   // far-right plot
+  Enes100.println("Far-right IR: " + String(rightIR, 2));
+
+  backUp(PLOT_SPACING_CM);      // IR now above the far-left plot
+
+  Enes100.println("Reading far-left plot...");
+  float leftIR = readPlot();    // far-left plot
+  Enes100.println("Far-left IR: " + String(leftIR, 2));
+
+  bool farRight = isOrzo(rightIR);
+  bool farLeft = isOrzo(leftIR);
+
+  int plot;
+  if (farLeft && farRight) plot = BOTH;
+  else if (farLeft)        plot = ADJACENT;
+  else if (farRight)       plot = DIAGONAL;
+  else                     plot = NEITHER;
+
+  Enes100.mission(LOCATION, plot);   // official result on the vision system page
+
+  // Summary printout (kept concise to stay well within the 8-message queue)
+  Enes100.println(String("Result -> L: ") + (farLeft ? "orzo" : "rocks") + " (" + String(leftIR, 1) + "), R: " + (farRight ? "orzo" : "rocks") + " (" + String(rightIR, 1) + ")");
+}
+
+void missionTwo() {
+  moveServo(arm, ARM_DOWN);
+  moveServo(bucket, BUCKET_SCOOP);
+  delay(500);
+  moveServo(bucket, BUCKET_DUMP);
+  moveServo(arm, ARM_UP);
+  moveServo(bucket, BUCKET_HOLD);
+}
+
+void missionThree() {
+  moveServo(arm, ARM_DOWN);
+  moveServo(bucket, BUCKET_SCOOP);
+  moveServo(arm, ARM_UP);
+}
+
+// ================ IR SENSOR ================
+
+float readPlot() {
+  float total = readIR();
+  int scans = 1;
+  while (scans < 4 && fabs(total / scans - IR_THRESHOLD) < IR_CHECK_ZONE) {
+    total += readIR();
+    scans++;
+  }
+  return total / scans;
+}
+
+float readIR() {
+  long sum = 0;
+  for (int i = 0; i < 50; i++) {
+    sum += analogRead(IR_PIN);
+    delay(10);
+  }
+  return sum / 50.0;
+}
+
+bool isOrzo(float value) {
+  return value < IR_THRESHOLD;
+}
+
+// ================ MOVEMENT ================
+
+void backUp(float cm) {
+  float x0 = -1, y0 = -1;
+  while (x0 < 0 || y0 < 0) {
+    x0 = Enes100.getX();
+    y0 = Enes100.getY();
+    delay(50);
+  }
+
+  unsigned long start = millis();
+  while (millis() - start < 15000) {
+    float x = Enes100.getX();
+    float y = Enes100.getY();
+    if (x >= 0 && y >= 0) {
+      float dx = x - x0;
+      float dy = y - y0;
+      if (sqrt(dx * dx + dy * dy) * 100 >= cm) break;
+    }
+    driveBackward();
+    delay(80);
+    stopMotors();
+    delay(350);
+  }
+  stopMotors();
+}
+
+void driveBackward() {
+  digitalWrite(IN1, LOW);  digitalWrite(IN2, HIGH);
+  digitalWrite(IN3, LOW);  digitalWrite(IN4, HIGH);
+  digitalWrite(ENA, HIGH);
+  digitalWrite(ENB, HIGH);
+}
+
+void stopMotors() {
+  digitalWrite(ENA, LOW);
+  digitalWrite(ENB, LOW);
+}
+
+void motorsOff() {
+  int pins[] = {ENA, IN1, IN2, ENB, IN3, IN4};
+  for (int p : pins) {
+    pinMode(p, OUTPUT);
+    digitalWrite(p, LOW);
+  }
+}
+
+// ================ SERVO HELPER ================
+
+void moveServo(Servo &s, int target) {
+  int pos = s.read();
+  while (pos != target) {
+    pos += (target > pos) ? 1 : -1;
+    s.write(pos);
+    delay(15);
+  }
+}
