@@ -13,8 +13,12 @@ const int ECHO = 11;
 // ===== OTV size (m, from the MS3 CAD: measure the real OTV) =====
 const float ARM_REACH  = 0.27;   // OTV center to arm tip (arm sticks out on the right)
 const float HALF_WIDTH = 0.115;  // OTV center to outside of the left wheels
-const float TURN_R     = 0.17;   // OTV center to farthest wheel corner = room needed to turn in place
 const float FRONT      = 0.10;   // OTV center to the ultrasonic sensor
+
+// FIX: turning in place sweeps the arm tip in a full circle, so the room needed to turn
+// is the ARM reach (0.27), not the wheel corner (0.17). The arm is the farthest point.
+const float TURN_R = ARM_REACH;
+const float MARGIN = 0.03;       // extra clearance for pose error and wobble
 
 // ===== Arena (m, from Arena Details: obstacle columns at x = 1.5 and 2.3) =====
 const float LANES[3] = {0.5, 1.0, 1.5};   // center y of the 3 obstacle rows (lane 0, 1, 2)
@@ -103,14 +107,14 @@ void setup() {
       return;
     }
 
-    // Where to switch lanes: in the gap between the columns. Moving sideways, the arm points along x
-    // (forward when moving up, backward when moving down), so give that side ARM_REACH and the other TURN_R.
+    // Where to switch lanes: in the gap between the columns.
+    // FIX: the OTV turns in place twice here (face sideways, then face +x again), and each turn
+    // sweeps the arm tip through a circle of radius TURN_R in ALL directions. So both sides of the
+    // gap need the same clearance -> the safest spot is the exact middle of the gap.
     float edge1 = col1X + OBS_DEPTH;   // back of column 1
     float face2 = hitX[first];         // front of column 2 (what lane "first" hit)
-    float crossX;
-    if (second > first) crossX = (edge1 + TURN_R + face2 - ARM_REACH) / 2;   // moving up: arm points forward
-    else                crossX = (edge1 + ARM_REACH + face2 - TURN_R) / 2;   // moving down: arm points back
-    if (face2 - edge1 < ARM_REACH + TURN_R) Enes100.println("Nav2: WARNING gap too small for the arm");
+    float crossX = (edge1 + face2) / 2;
+    if (face2 - edge1 < 2 * (TURN_R + MARGIN)) Enes100.println("Nav2: WARNING gap too small to turn with the arm");
 
     // Drive lane "first" to the gap, move sideways to lane "second", then drive to the finish line
     Enes100.print("Nav2: lane "); Enes100.print(first);
