@@ -107,17 +107,17 @@ void missionOne() {
   Enes100.mission(LOCATION, plot);   // official result, shown on the vision system page
 
   // Same result in words, with the IR numbers, so we can check it against the real plots
-  Enes100.println("Seen from the front of the site:");
+  Enes100.printf("Seen from the front of the site:");
   Enes100.print("far-left: ");
   Enes100.print(farLeft ? "orzo" : "rocks");
   Enes100.print(" (IR ");
   Enes100.print(leftIR);
-  Enes100.println(")");
+  Enes100.printf(")");
   Enes100.print("far-right: ");
   Enes100.print(farRight ? "orzo" : "rocks");
   Enes100.print(" (IR ");
   Enes100.print(rightIR);
-  Enes100.println(")");
+  Enes100.printf(")");
 }
 
 // Mission II: bury the lima bean at least 1 cm deep in the near-left plot.
@@ -251,7 +251,7 @@ long orzoSum = 0, rockSum = 0;                     // for the averages
 void calibrationStart() {
   arm.write(armPos);
   bucket.write(bucketPos);
-  Serial.println("Calibration. Commands: a <angle>, b <angle>, t, d+, d-, h, s, o, r, c");
+  Serial.printf("Calibration. Commands: a <angle>, b <angle>, t, d+, d-, h, s, o, r, c");
 }
 
 // Show live values once per second, and handle one command at a time
@@ -264,7 +264,7 @@ void calibrationLoop() {
     Serial.print("   arm: ");
     Serial.print(armPos);
     Serial.print("   bucket: ");
-    Serial.println(bucketPos);
+    Serial.printf(bucketPos);
   }
 
   if (!Serial.available()) return;
@@ -282,7 +282,7 @@ void calibrationLoop() {
     bucketPos = value;
   } else if (cmd == "t") {
     touchAngle = armPos;
-    Serial.println("Touch angle saved. Now type d+ if bigger numbers lowered the arm, d- if smaller numbers did");
+    Serial.printf("Touch angle saved. Now type d+ if bigger numbers lowered the arm, d- if smaller numbers did");
   } else if (cmd == "d+") {
     downDir = 1;
   } else if (cmd == "d-") {
@@ -306,15 +306,15 @@ void calibrationLoop() {
     }
     Serial.print("Recorded ");
     Serial.print(cmd == "o" ? "orzo: " : "rocks: ");
-    Serial.println(v);
+    Serial.printf(v);
   } else if (cmd == "c") {
     orzoMin = rockMin = 9999;
     orzoMax = rockMax = -1;
     orzoCount = rockCount = 0;
     orzoSum = rockSum = 0;
-    Serial.println("IR readings cleared");
+    Serial.printf("IR readings cleared");
   } else {
-    Serial.println("Commands: a <angle>, b <angle>, t, d+, d-, h, s, o, r, c");
+    Serial.printf("Commands: a <angle>, b <angle>, t, d+, d-, h, s, o, r, c");
     return;
   }
   printSettings();
@@ -322,38 +322,38 @@ void calibrationLoop() {
 
 // Print every setting we can work out so far, as code lines to copy.
 void printSettings() {
-  Serial.println();
-  Serial.println("--- Copy into the settings at the top ---");
+  Serial.printf();
+  Serial.printf("--- Copy into the settings at the top ---");
 
   // Arm: from the CAD simulation, dig 12 deg past touching, lift 15 deg above it
   if (touchAngle >= 0 && downDir != 0) {
     Serial.print("const int ARM_UP = ");
     Serial.print(constrain(touchAngle - 15 * downDir, 0, 180));
-    Serial.println(";");
+    Serial.printf(";");
     Serial.print("const int ARM_DOWN = ");
     Serial.print(constrain(touchAngle + 12 * downDir, 0, 180));
-    Serial.println(";");
+    Serial.printf(";");
   } else {
-    Serial.println("(ARM_UP / ARM_DOWN: type t, then d+ or d-)");
+    Serial.printf("(ARM_UP / ARM_DOWN: type t, then d+ or d-)");
   }
 
   // Bucket: DUMP is the same distance from HOLD as SCOOP, on the other side
   if (holdAngle >= 0) {
     Serial.print("const int BUCKET_HOLD = ");
     Serial.print(holdAngle);
-    Serial.println(";");
+    Serial.printf(";");
   } else {
-    Serial.println("(BUCKET_HOLD: level the bucket, then type h)");
+    Serial.printf("(BUCKET_HOLD: level the bucket, then type h)");
   }
   if (holdAngle >= 0 && scoopAngle >= 0) {
     Serial.print("const int BUCKET_SCOOP = ");
     Serial.print(scoopAngle);
-    Serial.println(";");
+    Serial.printf(";");
     Serial.print("const int BUCKET_DUMP = ");
     Serial.print(constrain(2 * holdAngle - scoopAngle, 0, 180));
-    Serial.println(";");
+    Serial.printf(";");
   } else {
-    Serial.println("(BUCKET_SCOOP / BUCKET_DUMP: turn the bucket to scoop, then type s)");
+    Serial.printf("(BUCKET_SCOOP / BUCKET_DUMP: turn the bucket to scoop, then type s)");
   }
 
   // IR: threshold halfway between the CLOSEST orzo and rock readings.
@@ -365,23 +365,23 @@ void printSettings() {
       orzoHigher = orzoMin > rockMax;
       threshold = orzoHigher ? (orzoMin + rockMax) / 2 : (orzoMax + rockMin) / 2;
       int gap = orzoHigher ? orzoMin - rockMax : rockMin - orzoMax;
-      if (gap < 50) Serial.println("Note: IR gap under 50. Still OK to use, but a reading could be misread.");
+      if (gap < 50) Serial.printf("Note: IR gap under 50. Still OK to use, but a reading could be misread.");
     } else {                                          // they overlap
       int orzoAvg = orzoSum / orzoCount;
       int rockAvg = rockSum / rockCount;
       orzoHigher = orzoAvg > rockAvg;
       threshold = (orzoAvg + rockAvg) / 2;
-      Serial.println("Note: orzo and rock readings overlap. Using halfway between the averages.");
-      Serial.println("Still usable, but some spots could be misread.");
+      Serial.printf("Note: orzo and rock readings overlap. Using halfway between the averages.");
+      Serial.printf("Still usable, but some spots could be misread.");
     }
     Serial.print("const int IR_THRESHOLD = ");
     Serial.print(threshold);
-    Serial.println(";");
+    Serial.printf(";");
     Serial.print("const bool ORZO_IS_HIGHER = ");
     Serial.print(orzoHigher ? "true" : "false");
-    Serial.println(";");
+    Serial.printf(";");
   } else {
-    Serial.println("(IR: type o above orzo and r above rocks)");
+    Serial.printf("(IR: type o above orzo and r above rocks)");
   }
-  Serial.println();
+  Serial.printf();
 }
