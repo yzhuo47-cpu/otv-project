@@ -99,10 +99,10 @@ void missionOne() {
   Enes100.mission(LOCATION, plot);   // official result, shown on the vision system page
 
   // Same result in words, with the IR numbers, so we can check it against the real plots.
-  // One printf per line: each print call takes a slot in the library's 8-message queue.
-  Enes100.printf("Seen from the front of the site:");
-  Enes100.printf(String("far-left: ") + (farLeft ? "orzo" : "rocks") + " (IR " + String(leftIR, 1) + ")");
-  Enes100.printf(String("far-right: ") + (farRight ? "orzo" : "rocks") + " (IR " + String(rightIR, 1) + ")");
+  // One println per line: each print call takes a slot in the library's 8-message queue.
+  Enes100.println("Seen from the front of the site:");
+  Enes100.println(String("far-left: ") + (farLeft ? "orzo" : "rocks") + " (IR " + String(leftIR, 1) + ")");
+  Enes100.println(String("far-right: ") + (farRight ? "orzo" : "rocks") + " (IR " + String(rightIR, 1) + ")");
 }
 
 // Mission II: bury the lima bean at least 1 cm deep in the near-left plot.
