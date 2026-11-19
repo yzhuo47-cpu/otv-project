@@ -7,10 +7,10 @@
 // 0 = Calibration: find the servo angles and the IR threshold (Serial Monitor commands)
 // 1 = Front of the site: Mission II (plant seed) + Mission III (collect rocks)
 // 2 = Back of the site:  Mission I (read the two far plots + send the result)
-const int MODE = 1;
+const int MODE = 0;
 
 // Vision system (UNO R4 WiFi: Wi-Fi is built in)
-const int MARKER_ID = 205;  // number of the ArUco marker on top of the OTV
+const int MARKER_ID = 147;  // number of the ArUco marker on top of the OTV
 const int ROOM = 1201;      // arena room: 1201 open lab, 1116 / 1120 classrooms
 
 // Motor pins (L298N driver)
