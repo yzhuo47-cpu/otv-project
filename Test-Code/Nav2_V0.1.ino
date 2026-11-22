@@ -18,7 +18,7 @@ const float LanesX[2] = {1.4, 2.2};
 //Variables for OTV
 const float OffsetX;
 const float OffsetY;
-float x, y, theta;
+float x, y, theta, degree;
 //Variables for Timing
 const int Settle = 500;
 
