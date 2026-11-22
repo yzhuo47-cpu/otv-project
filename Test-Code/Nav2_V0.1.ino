@@ -89,7 +89,7 @@ void goTo(float xpos, float ypos) {
     distance = distanceTo(xpos, ypos);
     turnTo(angleTo(xpos, ypos));
     DriveSpeed = 224 * pow(2 * distance, 0.75);
-    float ms = distance / 0.4;
+    float ms = distance / 0.5 * 1000;
     setMotors(DriveSpeed, DriveSpeed);
     delay((unsigned long)ms);
     stabilize();
