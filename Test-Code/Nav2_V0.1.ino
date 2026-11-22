@@ -12,7 +12,6 @@ const int ECHO = 11;
 const int R_EN = 10, R_IN1 = 9, R_IN2 = 8;
 const int L_EN = 5, L_IN3 = 7, L_IN4 = 6;
 //Variables for Arena
-const float PastObstaclesX = 2.9;
 const float LanesY[3] = {0.5, 1.0, 1.5};
 const float LanesX[2] = {1.4, 2.2};
 //Variables for OTV
@@ -37,7 +36,23 @@ void setup() {
   establishLaneOrder();
   for (float LaneY : LanesY) {
     goTo(1, LaneY);
-    //NEED SENSING FUNCTION HERE
+    turnTo(0);
+    if (median3(medianDistanceCM(), medianDistanceCM(), medianDistanceCM()) >= 50) {
+      goTo(1.8, LaneY);
+      break;
+    }
+  }
+  LanesY[0] = 0.5;
+  LanesY[1] = 1.0;
+  LanesY[2] = 1.5;
+  establishLaneOrder();
+  for (float LaneY : LanesY) {
+    goTo(1.8, LaneY);
+    turnTo(0);
+    if (median3(medianDistanceCM(), medianDistanceCM(), medianDistanceCM()) >= 50) {
+      goTo(2.9, LaneY);
+      break;
+    }
   }
 } //Setup End
 
