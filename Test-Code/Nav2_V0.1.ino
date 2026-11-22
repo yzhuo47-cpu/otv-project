@@ -18,6 +18,9 @@ const float LanesX[2] = {1.4, 2.2};
 //Variables for OTV
 const float OffsetX;
 const float OffsetY;
+float x, y, theta;
+//Variables for Timing
+const int Settle = 500;
 
 void setup() {
   pinMode(R_EN, OUTPUT); pinMode(R_IN1 OUTPUT); pinMode(R_IN2, OUTPUT);
@@ -38,6 +41,12 @@ void loop() {
 void stopMotors() {
   analogWrite(L_EN, 0);
   analogWrite(R_EN, 0);
+}
+void goTo(float xpos, float ypos) {
+  
+}
+void turnTo(float targetAngle) {
+  
 }
 bool canTrack() {
   if (!Enes100.isVisible()) {
