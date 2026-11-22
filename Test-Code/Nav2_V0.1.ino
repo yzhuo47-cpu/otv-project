@@ -54,6 +54,8 @@ void setup() {
       break;
     }
   }
+  stopMotors();
+  Enes100.printf("Nav2: Past all Obstacles");
 } //Setup End
 
 void loop() {
