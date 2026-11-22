@@ -141,7 +141,7 @@ bool canTrack() {
   }
   theta = Enes100.getTheta();
   x = Enes100.getx() + (OffsetX * cos(theta)) - (OffsetY * sin(theta));
-  y = Enes100.getY() + (OffsetY * sin(theta)) + (OffsetY * cos(theta));
+  y = Enes100.getY() + (OffsetX * sin(theta)) + (OffsetY * cos(theta));
   return true;
 }
 void establishLaneOrder() {
