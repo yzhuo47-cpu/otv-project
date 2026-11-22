@@ -16,9 +16,9 @@ const float PastObstaclesX = 2.9;
 const float LanesY[3] = {0.5, 1.0, 1.5};
 const float LanesX[2] = {1.4, 2.2};
 //Variables for OTV
-const float OffsetX;
-const float OffsetY;
-float x, y, theta, degree;
+const float OffsetX = 0;
+const float OffsetY = 0;
+float x, y, theta;
 //Variables for Timing
 const int Settle = 500;
 
@@ -62,16 +62,6 @@ void getData() {
   x = Enes100.getx() + (OffsetX * cos(theta));
   y = Enes100.getY() + (OffsetY * sin(theta));
 }
-
-
-
-
-
-
-
-
-
-
 
 
 
