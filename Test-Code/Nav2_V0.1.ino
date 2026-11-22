@@ -20,7 +20,7 @@ int DriveSpeed = 224; //PWM
 int TurnSpeed = 224; //PWM
 float x, y, theta;
 //Variables for Timing
-const int Settle = 300;
+const int Settle = 333;
 
 void setup() {
   pinMode(R_EN, OUTPUT);
