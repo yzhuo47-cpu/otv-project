@@ -119,7 +119,19 @@ bool canTrack() {
   y = Enes100.getY() + (OffsetY * sin(theta));
   return true;
 }
-
+void establishLaneOrder() {
+  stabilize();
+  if (y >= 1) {
+    float value = LanesY[0];
+    LanesY[0] = LanesY[2];
+    LanesY[2] = value;
+  }
+  else {
+    float value = LanesY[2];
+    LanesY[2] = LanesY[0];
+    LanesY[0] = value;
+  }
+}
 
 
 
