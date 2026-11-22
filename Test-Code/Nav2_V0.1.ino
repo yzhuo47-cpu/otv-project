@@ -85,8 +85,8 @@ void setMotors(int left, int right) {
   digitalWrite(L_IN4, left >= 0 ? LOW : HIGH);
   digitalWrite(R_IN1, right >= 0 ? HIGH : LOW);
   digitalWrite(R_IN2, right >= 0 ? LOW : HIGH);
-  analogWrite(L_EN, constrain(abs(left), 128, 255));
-  analogWrite(R_EN, constrain(abs(right), 128, 255));
+  analogWrite(L_EN, (left == 0) ? 0 : constrain(abs(left), 128, 255));
+  analogWrite(R_EN, (right == 0) ? 0 : constrain(abs(right), 128, 255));
 }
 void goTo(float xpos, float ypos) {
   stabilize();
@@ -104,7 +104,7 @@ void turnTo(float targetAngle) {
   stabilize();
   while (fabs(angleDifference(targetAngle, theta)) > (PI / 36)) {
     float difference = angleDifference(targetAngle, theta);
-    TurnSpeed = (448 / PI) * atan(((difference + pow(difference / (12 * PI), 3)) / (12*PI)));
+    TurnSpeed = 128 + 6144 * pow((difference / PI), 3);
     float ms = 500.0f;
     setMotors(-TurnSpeed, TurnSpeed);
     delay((unsigned long)ms);
@@ -147,14 +147,14 @@ bool canTrack() {
 void establishLaneOrder() {
   stabilize();
   if (y >= 1) {
-    float value = LanesY[0];
-    LanesY[0] = LanesY[2];
-    LanesY[2] = value;
+    LanesY[0] = 1.5;
+    LanesY[1] = 1.0;
+    LanesY[2] = 0.5;
   }
   else {
-    float value = LanesY[2];
-    LanesY[2] = LanesY[0];
-    LanesY[0] = value;
+    LanesY[0] = 0.5;
+    LanesY[1] = 1.0;
+    LanesY[2] = 1.5;
   }
 }
 float scan() {
@@ -184,7 +184,7 @@ float scan() {
       Enes100.printf("Nav2: ultrasonic no echo");
     }
     else {
-      Enes100.printf("Nav2: ultrasonic", cm, "cm");
+      Enes100.printf("Nav2: ultrasonic %.1f cm", cm);
     }
   }
   return cm;
