@@ -104,7 +104,7 @@ void turnTo(float targetAngle) {
   stabilize();
   while (fabs(angleDifference(targetAngle, theta)) > (PI / 36)) {
     float difference = angleDifference(targetAngle, theta);
-    TurnSpeed = 128 + 6144 * pow((difference / PI), 3);
+    TurnSpeed = (difference >= 0 ? 1 : -1) * (128 + 6144 * pow((fabs(difference) / PI), 3));
     float ms = 500.0f;
     setMotors(-TurnSpeed, TurnSpeed);
     delay((unsigned long)ms);
@@ -140,8 +140,8 @@ bool canTrack() {
     return false;
   }
   theta = Enes100.getTheta();
-  x = Enes100.getx() + (OffsetX * cos(theta));
-  y = Enes100.getY() + (OffsetY * sin(theta));
+  x = Enes100.getx() + (OffsetX * cos(theta)) - (OffsetY * sin(theta));
+  y = Enes100.getY() + (OffsetY * sin(theta)) + (OffsetY * cos(theta));
   return true;
 }
 void establishLaneOrder() {
