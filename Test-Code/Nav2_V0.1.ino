@@ -18,6 +18,8 @@ const float LanesX[2] = {1.4, 2.2};
 //Variables for OTV
 const float OffsetX = 0;
 const float OffsetY = 0;
+int DriveSpeed = 224; //PWM
+int TurnSpeed = 224; //PWM
 float x, y, theta;
 //Variables for Timing
 const int Settle = 300;
@@ -31,11 +33,13 @@ void setup() {
   Enes100.begin("The Harvesters", SEED, MARKER_ID, ROOM);
   while (!canTrack()) {}
   Enes100.printf("Nav2: start");
-  //SETUP END
-}
+} //Setup End
+
 void loop() {
   stopMotors();
 }
+
+
 
 //FUNCTIONS
 void stabilize() {
@@ -47,11 +51,40 @@ void stopMotors() {
   analogWrite(L_EN, 0);
   analogWrite(R_EN, 0);
 }
+void setMotors(int left, int right) {
+  left = constrain(left, -255, 255);
+  right = constrain(right, -255, 255);
+  digitalWrite(L_IN3, left >= 0 ? HIGH : LOW);
+  digitalWrite(L_IN4, left >= 0 ? LOW : HIGH);
+  digitalWrite(R_IN1, right >= 0 ? HIGH : LOW);
+  digitalWrite(R_IN2, right >= 0 ? LOW : HIGH);
+  analogWrite(L_EN, constrain(abs(left), 128, 255));
+  analogWrite(R_EN, constrain(abs(right), 128, 255));
+}
 void goTo(float xpos, float ypos) {
   stabilize();
+  while (!canTrack()) {}
+  while (distanceTo(xpos, ypos) > 0.1) {
+    distance = distanceTo(xpos, ypos);
+    turnTo(angleTo(xpos, ypos));
+    DriveSpeed = 224 * pow(2 * distance, 0.75);
+    float ms = distance / 0.4;
+    setMotors(DriveSpeed, DriveSpeed);
+    delay((unsigned long)ms);
+    stabilize();
+  }
 }
 void turnTo(float targetAngle) {
   stabilize();
+  while (!canTrack()) {}
+  while (fabs(angleDifference(targetAngle, theta)) > (PI / 36)) {
+    difference = angleDifference(targetAngle, theta);
+    TurnSpeed = (448 / PI) * atan(((difference + pow(difference / (12 * PI), 3)) / (12*PI)));
+    float ms = 500.0f
+    setMotors(-TurnSpeed, TurnSpeed);
+    delay((unsigned long)ms);
+    stabilize();
+  }
 }
 float angleDifference(float target, float current) {
   float difference = target - current;
@@ -62,6 +95,18 @@ float angleDifference(float target, float current) {
     difference += 2 * PI;
   }
   return difference;
+}
+float distanceTo(float xpos, float ypos) {
+  float dx = xpos - x;
+  float dy = ypos - y;
+  float distance = sqrt(dx * dx + dy * dy);
+  return distance;
+}
+float angleTo(float xpos, float ypos) {
+  float dx = xpos - x;
+  float dy = ypos - y;
+  float angle = atan2(dy, dx);
+  return angle;
 }
 bool canTrack() {
   if (!Enes100.isVisible()) {
