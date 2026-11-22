@@ -20,7 +20,7 @@ const float OffsetX = 0;
 const float OffsetY = 0;
 float x, y, theta;
 //Variables for Timing
-const int Settle = 500;
+const int Settle = 300;
 
 void setup() {
   pinMode(R_EN, OUTPUT); pinMode(R_IN1 OUTPUT); pinMode(R_IN2, OUTPUT);
@@ -38,15 +38,30 @@ void loop() {
 }
 
 //FUNCTIONS
+void stabilize() {
+  stopMotors();
+  delay(Settle);
+  while (!canTrack()) {}
+}
 void stopMotors() {
   analogWrite(L_EN, 0);
   analogWrite(R_EN, 0);
 }
 void goTo(float xpos, float ypos) {
-  
+  stabilize();
 }
 void turnTo(float targetAngle) {
-  
+  stabilize();
+}
+float angleDifference(float target, float current) {
+  float difference = target - current;
+  while (difference > PI) {
+    difference -= 2 * PI;
+  }
+  while (difference < -PI) {
+    difference += 2 * PI;
+  }
+  return difference;
 }
 bool canTrack() {
   if (!Enes100.isVisible()) {
@@ -54,15 +69,11 @@ bool canTrack() {
     delay(50);
     return false;
   }
-  getData();
-  return true;
-}
-void getData() {
   theta = Enes100.getTheta();
   x = Enes100.getx() + (OffsetX * cos(theta));
   y = Enes100.getY() + (OffsetY * sin(theta));
+  return true;
 }
-
 
 
 
