@@ -32,7 +32,7 @@ void setup() {
   Enes100.begin("The Harvesters", SEED, MARKER_ID, ROOM);
   while (!canTrack()) {}
   Enes100.printf("Nav2: start"); //Starts Navigating Here
-  //PUT FUNCTION HERE TO MOVE OTV SAFELY TO x=1
+  startProcedure();
   establishLaneOrder();
   for (float LaneY : LanesY) {
     goTo(1, LaneY);
@@ -86,9 +86,8 @@ void setMotors(int left, int right) {
 }
 void goTo(float xpos, float ypos) {
   stabilize();
-  while (!canTrack()) {}
   while (distanceTo(xpos, ypos) > 0.1) {
-    distance = distanceTo(xpos, ypos);
+    float distance = distanceTo(xpos, ypos);
     turnTo(angleTo(xpos, ypos));
     DriveSpeed = 224 * pow(2 * distance, 0.75);
     float ms = distance / 0.5 * 1000;
@@ -99,9 +98,8 @@ void goTo(float xpos, float ypos) {
 }
 void turnTo(float targetAngle) {
   stabilize();
-  while (!canTrack()) {}
   while (fabs(angleDifference(targetAngle, theta)) > (PI / 36)) {
-    difference = angleDifference(targetAngle, theta);
+    float difference = angleDifference(targetAngle, theta);
     TurnSpeed = (448 / PI) * atan(((difference + pow(difference / (12 * PI), 3)) / (12*PI)));
     float ms = 500.0f
     setMotors(-TurnSpeed, TurnSpeed);
@@ -196,7 +194,31 @@ float medianDistanceCM() {
   float c = scan();
   return median3(a, b, c);
 }
-
+void startProcedure() { //THIS IS A WEAK VERSION OF goTo()
+  stabilize();
+  if (fabs(theta) < PI / 2) {
+    turnTo(0);
+    while (distanceTo(1, y) > 0.1) {
+      float distance = distanceTo(1, y);
+      DriveSpeed = 224 * pow(2 * distance, 0.75);
+      float ms = distance / 0.5 * 1000;
+      setMotors(DriveSpeed, DriveSpeed);
+      delay((unsigned long)ms);
+      stabilize();
+    }
+  }
+  else {
+    turnTo(PI);
+    while (distanceTo(1, y) > 0.1) {
+      float distance = distanceTo(1, y);
+      DriveSpeed = 224 * pow(2 * distance, 0.75);
+      float ms = distance / 0.5 * 1000;
+      setMotors(-DriveSpeed, -DriveSpeed);
+      delay((unsigned long)ms);
+      stabilize();
+    }
+  }
+}
 
 
 
