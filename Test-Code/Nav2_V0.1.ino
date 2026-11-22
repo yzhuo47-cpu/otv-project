@@ -138,8 +138,47 @@ void establishLaneOrder() {
     LanesY[0] = value;
   }
 }
-
-
+float scan() {
+  static unsigned long lastPing = 0;
+  unsigned long since = millis() - lastPing;
+  if (since < 60) {
+    delay(60 - since);
+  }
+  lastPing = millis();
+  
+  vTaskSuspendAll();
+  digitalWrite(TRIG, LOW);
+  delayMicroseconds(2);
+  digitalWrite(TRIG, HIGH);
+  delayMicroseconds(10);
+  digitalWrite(TRIG, LOW);
+  long t = pulseIn(ECHO, HIGH, 30000);
+  xTaskResumeAll();
+  float cm = (t == 0) ? 999 : t * 0.0343 / 2;
+  
+  static bool reported = false;
+  static unsigned long lastReport = 0;
+  if (!reported || millis() - lastReport >= 500) {
+    reported = true;
+    lastReport = millis();
+    if (t == 0) {
+      Enes100.printf("Nav2: ultrasonic no echo");
+    }
+    else {
+      Enes100.printf("Nav2: ultrasonic", cm, "cm");
+    }
+  }
+  return cm;
+}
+float median3(float a, float b, float c) {
+  return max(min(a, b), min(max(a, b), c));
+}
+float medianDistanceCM() {
+  float a = scan();
+  float b = scan();
+  float c = scan();
+  return median3(a, b, c);
+}
 
 
 
