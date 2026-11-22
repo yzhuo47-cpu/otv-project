@@ -12,8 +12,7 @@ const int ECHO = 11;
 const int R_EN = 10, R_IN1 = 9, R_IN2 = 8;
 const int L_EN = 5, L_IN3 = 7, L_IN4 = 6;
 //Variables for Arena
-const float LanesY[3] = {0.5, 1.0, 1.5};
-const float LanesX[2] = {1.4, 2.2};
+float LanesY[3] = {0.5, 1.0, 1.5};
 //Variables for OTV
 const float OffsetX = 0.06;
 const float OffsetY = -0.08; //Total Guess
@@ -24,9 +23,14 @@ float x, y, theta;
 const int Settle = 300;
 
 void setup() {
-  pinMode(R_EN, OUTPUT); pinMode(R_IN1 OUTPUT); pinMode(R_IN2, OUTPUT);
-  pinMode(L_EN, OUTPUT); pinMode(L_IN3, OUTPUT); pinMode(L_IN4, OUTPUT);
-  pinMode(TRIG, OUTPUT); pinMode(ECHO, INPUT);
+  pinMode(R_EN, OUTPUT);
+  pinMode(R_IN1, OUTPUT);
+  pinMode(R_IN2, OUTPUT);
+  pinMode(L_EN, OUTPUT);
+  pinMode(L_IN3, OUTPUT);
+  pinMode(L_IN4, OUTPUT);
+  pinMode(TRIG, OUTPUT);
+  pinMode(ECHO, INPUT);
   stopMotors();
 
   Enes100.begin("The Harvesters", SEED, MARKER_ID, ROOM);
@@ -101,7 +105,7 @@ void turnTo(float targetAngle) {
   while (fabs(angleDifference(targetAngle, theta)) > (PI / 36)) {
     float difference = angleDifference(targetAngle, theta);
     TurnSpeed = (448 / PI) * atan(((difference + pow(difference / (12 * PI), 3)) / (12*PI)));
-    float ms = 500.0f
+    float ms = 500.0f;
     setMotors(-TurnSpeed, TurnSpeed);
     delay((unsigned long)ms);
     stabilize();
