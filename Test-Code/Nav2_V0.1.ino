@@ -16,8 +16,8 @@ const float PastObstaclesX = 2.9;
 const float LanesY[3] = {0.5, 1.0, 1.5};
 const float LanesX[2] = {1.4, 2.2};
 //Variables for OTV
-const float OffsetX = 0;
-const float OffsetY = 0;
+const float OffsetX = 0.06;
+const float OffsetY = -0.08; //Total Guess
 int DriveSpeed = 224; //PWM
 int TurnSpeed = 224; //PWM
 float x, y, theta;
@@ -32,7 +32,13 @@ void setup() {
 
   Enes100.begin("The Harvesters", SEED, MARKER_ID, ROOM);
   while (!canTrack()) {}
-  Enes100.printf("Nav2: start");
+  Enes100.printf("Nav2: start"); //Starts Navigating Here
+  //PUT FUNCTION HERE TO MOVE OTV SAFELY TO x=1
+  establishLaneOrder();
+  for (float LaneY : LanesY) {
+    goTo(1, LaneY);
+    //NEED SENSING FUNCTION HERE
+  }
 } //Setup End
 
 void loop() {
