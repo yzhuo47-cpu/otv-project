@@ -35,7 +35,7 @@ void setup() {
 
   Enes100.begin("The Harvesters", SEED, MARKER_ID, ROOM);
   while (!canTrack()) {}
-  Enes100.printf("Nav2: start"); //Starts Navigating Here
+  Enes100.println("Nav2: start"); //Starts Navigating Here
   startProcedure();
   establishLaneOrder();
   for (float LaneY : LanesY) {
@@ -59,7 +59,7 @@ void setup() {
     }
   }
   stopMotors();
-  Enes100.printf("Nav2: Past all Obstacles");
+  Enes100.println("Nav2: Past all Obstacles");
 } //Setup End
 
 void loop() {
@@ -140,7 +140,7 @@ bool canTrack() {
     return false;
   }
   theta = Enes100.getTheta();
-  x = Enes100.getx() + (OffsetX * cos(theta)) - (OffsetY * sin(theta));
+  x = Enes100.getX() + (OffsetX * cos(theta)) - (OffsetY * sin(theta));
   y = Enes100.getY() + (OffsetX * sin(theta)) + (OffsetY * cos(theta));
   return true;
 }
@@ -181,10 +181,10 @@ float scan() {
     reported = true;
     lastReport = millis();
     if (t == 0) {
-      Enes100.printf("Nav2: ultrasonic no echo");
+      Enes100.println("Nav2: ultrasonic no echo");
     }
     else {
-      Enes100.printf("Nav2: ultrasonic %.1f cm", cm);
+      Enes100.println("Nav2: ultrasonic %.1f cm", cm);
     }
   }
   return cm;
