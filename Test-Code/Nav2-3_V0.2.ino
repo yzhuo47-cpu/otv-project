@@ -110,7 +110,7 @@ void turnTo(float targetAngle) {
   while (fabs(angleDifference(targetAngle, theta)) > (PI / 36)) {
     float difference = angleDifference(targetAngle, theta);
     TurnSpeed = (difference >= 0 ? 1 : -1) * (128 + 6144 * pow((fabs(difference) / PI), 3));
-    float ms = 500.0f;
+    float ms = constrain(500.0f * fabs(difference), 100.0f, 500.0f);
     setMotors(-TurnSpeed, TurnSpeed);
     delay((unsigned long)ms);
     stabilize();
