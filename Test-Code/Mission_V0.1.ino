@@ -66,6 +66,7 @@ void setup() {
   }
   moveServo(arm, 60);
   moveServo(bucket, 60);
+  stabilize();
   turnTo(theta + PI / 2);
   pulse(0.06);
   OrzoTest = readIR();
@@ -84,8 +85,10 @@ void setup() {
   delay(250);
   moveServo(arm, 60);
   pulse(0.25);
+  stabilize();
   turnTo(theta - PI / 2);
   pulse(0.4);
+  stabilize();
   turnTo(theta - PI / 2);
   pulse(0.3);
   LeftPlot = readIR();
@@ -199,7 +202,7 @@ void turnTo(float targetAngle) {
   while (fabs(angleDifference(targetAngle, theta)) > (PI / 36)) {
     float difference = angleDifference(targetAngle, theta);
     TurnSpeed = (difference >= 0 ? 1 : -1) * (128 + 6144 * pow((fabs(difference) / PI), 3));
-    float ms = 500.0f;
+    float ms = constrain(500.0f * fabs(difference), 100.0f, 500.0f);
     setMotors(-TurnSpeed, TurnSpeed);
     delay((unsigned long)ms);
     stabilize();
