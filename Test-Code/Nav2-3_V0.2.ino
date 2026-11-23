@@ -12,7 +12,7 @@ const int ECHO = 11;
 const int R_EN = 10, R_IN1 = 9, R_IN2 = 8;
 const int L_EN = 5, L_IN3 = 7, L_IN4 = 6;
 //Variables for Arena
-float LanesY[3] = {0.5, 1.0, 1.5};
+float LanesY[3] = {0.5, 1.0, 1.5}; //Columns are at x=1.4, x=2.2
 //Variables for OTV
 const float OffsetX = 0.06;
 const float OffsetY = -0.08; //Total Guess
@@ -59,7 +59,12 @@ void setup() {
     }
   }
   stopMotors();
-  Enes100.println("Nav2: Past all Obstacles");
+  Enes100.println("Nav2: end");
+  Enes100.println("Nav3: start");
+  goTo(2.9, 1.5);
+  goTo(3.7, 1.5);
+  stopMotors();
+  Enes100.println("Nav3: end");
 } //Setup End
 
 void loop() {
