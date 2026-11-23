@@ -248,14 +248,14 @@ void moveServo(Servo &s, int target) {
 }
 void compare() {
   if (fabs(LeftPlot - RightPlot) < 2.00) { //BASICALLY THE SAME
-    if (min(LeftPlot, RightPlot) > Threshold) {
+    if (min(LeftPlot, RightPlot) > Threshold) { //CAN REPLACE THRESHOLD WITH ORZOTEST LATER
       Enes100.mission(LOCATION, NEITHER);
     }
     else {
       Enes100.mission(LOCATION, BOTH);
     }
   }
-  else if (LeftPlot < Threshold) {
+  else if (LeftPlot < RightPlot) {
     Enes100.mission(LOCATION, DIAGONAL);
   }
   else {
