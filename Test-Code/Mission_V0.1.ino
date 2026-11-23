@@ -6,7 +6,7 @@
 //Variables
 //Variables for Connection
 const int MARKER_ID = 147;
-const int ROOM = 1201l
+const int ROOM = 1201;
 //Variables for Pins
 const int TRIG = 12;
 const int ECHO = 11;
@@ -25,10 +25,10 @@ float x, y, theta;
 //Variables for Timing
 const int Settle = 333;
 //Variables for Sensing
-const int Threshold = 27;
+const float Threshold = 27.0;
 float LeftPlot;
 float RightPlot;
-float OrzoTest;
+float OrzoTest; //Not Used Right Now
 //Other Stuff
 Servo arm;
 Servo bucket;
@@ -61,7 +61,7 @@ void setup() {
     goTo(0.5 + OffsetY, 0.62);
   }
   while (median3(medianDistanceCM(), medianDistanceCM(), medianDistanceCM()) <= 9) {
-    float distance = median3(medianDistanceCM(), medianDistanceCM(), medianDistanceCM());
+    float distance = median3(medianDistanceCM(), medianDistanceCM(), medianDistanceCM()) / 100.0;
     pulse(0.1 - distance);
   }
   moveServo(arm, 60);
@@ -219,7 +219,9 @@ void goTo(float xpos, float ypos) {
 }
 void pulse(float distance) {
   stabilize();
-  DriveSpeed = 224 * pow(2 * distance, 0.75);
+  int sign = (distance < 0) ? -1 : 1;
+  DriveSpeed = 224 * pow(2 * fabs(distance), 0.75);
+  DriveSpeed *= sign;
   float ms = fabs(distance) / 0.5 * 1000;
   setMotors(DriveSpeed, DriveSpeed);
   delay((unsigned long)ms);
@@ -250,7 +252,7 @@ void compare() {
       Enes100.mission(LOCATION, BOTH);
     }
   }
-  if (LeftPlot < Threshold) {
+  else if (LeftPlot < Threshold) {
     Enes100.mission(LOCATION, DIAGONAL);
   }
   else {
