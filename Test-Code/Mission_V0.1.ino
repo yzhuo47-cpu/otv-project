@@ -26,6 +26,9 @@ float x, y, theta;
 const int Settle = 333;
 //Variables for Sensing
 const int Threshold = 27;
+float LeftPlot;
+float RightPlot;
+float OrzoTest;
 //Other Stuff
 Servo arm;
 Servo bucket;
@@ -42,9 +45,53 @@ void setup() {
   arm.attach(ARM_PIN);
   bucket.attach(BUCKET_PIN);
   stopMotors();
+  moveServo(arm, 90);
+  moveServo(bucket, 90);
 
   Enes100.begin("The Harvesters", SEED, MARKER_ID, ROOM);
   while (!canTrack()) {}
+  if (y < 1) {
+    goTo(0.5 - OffsetY, 0.5);
+    turnTo(PI / 2);
+    goTo(0.5 - OffsetY, 1.38);
+  }
+  else {
+    goTo(0.5 + OffsetY, 1.5);
+    turnTo(-PI / 2);
+    goTo(0.5 + OffsetY, 0.62);
+  }
+  while (median3(medianDistanceCM(), medianDistanceCM(), medianDistanceCM()) <= 9) {
+    float distance = median3(medianDistanceCM(), medianDistanceCM(), medianDistanceCM());
+    pulse(0.1 - distance);
+  }
+  moveServo(arm, 60);
+  moveServo(bucket, 60);
+  turnTo(theta + PI / 2);
+  pulse(0.06);
+  OrzoTest = readIR();
+  pulse(-0.06);
+  moveServo(arm, 90);
+  delay(100);
+  moveServo(bucket, 165);
+  delay(250);
+  moveServo(arm, 60);
+  delay(100);
+  moveServo(bucket, 60);
+  pulse(-0.084);
+  moveServo(arm, 90);
+  delay(100);
+  moveServo(bucket, 165);
+  delay(250);
+  moveServo(arm, 60);
+  pulse(0.25);
+  turnTo(theta - PI / 2);
+  pulse(0.4);
+  turnTo(theta - PI / 2);
+  pulse(0.3);
+  LeftPlot = readIR();
+  pulse(-0.084);
+  RightPlot = readIR();
+  compare();
 } //Setup End
 
 void loop() {
@@ -170,13 +217,43 @@ void goTo(float xpos, float ypos) {
     stabilize();
   }
 }
-
-
-
-
-
-
-
-
-
-
+void pulse(float distance) {
+  stabilize();
+  DriveSpeed = 224 * pow(2 * distance, 0.75);
+  float ms = fabs(distance) / 0.5 * 1000;
+  setMotors(DriveSpeed, DriveSpeed);
+  delay((unsigned long)ms);
+  stabilize();
+}
+float readIR() {
+  long sum = 0;
+  for (int i = 0; i < 50; i++) {
+    sum += analogRead(IR_PIN);
+    delay(10);
+  }
+  return sum / 50.0;
+}
+void moveServo(Servo &s, int target) {
+  int pos = s.read();
+  while (pos != target) {
+    pos += (target > pos) ? 1 : -1;
+    s.write(pos);
+    delay(15);
+  }
+}
+void compare() {
+  if (fabs(LeftPlot - RightPlot) < 2.00) { //BASICALLY THE SAME
+    if (min(LeftPlot, RightPlot) > Threshold) {
+      Enes100.mission(LOCATION, NEITHER);
+    }
+    else {
+      Enes100.mission(LOCATION, BOTH);
+    }
+  }
+  if (LeftPlot < Threshold) {
+    Enes100.mission(LOCATION, DIAGONAL);
+  }
+  else {
+    Enes100.mission(LOCATION, ADJACENT);
+  }
+}
