@@ -17,7 +17,7 @@ const int BUCKET_PIN = A2;
 const int IR_PIN = A0;
 //Variables for Arena
 //Variables for OTV
-const float OffsetX = 0.06;
+const float OffsetX = -0.06;
 const float OffsetY = -0.08; //Total Guess
 int DriveSpeed = 224;
 int TurnSpeed = 224;
@@ -199,10 +199,10 @@ float angleDifference(float target, float current) {
 }
 void turnTo(float targetAngle) {
   stabilize();
-  while (fabs(angleDifference(targetAngle, theta)) > (PI / 36)) {
+  while (fabs(angleDifference(targetAngle, theta)) > (PI / 72)) {
     float difference = angleDifference(targetAngle, theta);
     TurnSpeed = (difference >= 0 ? 1 : -1) * (128 + 6144 * pow((fabs(difference) / PI), 3));
-    float ms = constrain(500.0f * fabs(difference), 100.0f, 500.0f);
+    float ms = constrain(1000.0f * fabs(difference), 100.0f, 500.0f);
     setMotors(-TurnSpeed, TurnSpeed);
     delay((unsigned long)ms);
     stabilize();
@@ -214,7 +214,7 @@ void goTo(float xpos, float ypos) {
     float distance = distanceTo(xpos, ypos);
     turnTo(angleTo(xpos, ypos));
     DriveSpeed = 224 * pow(2 * distance, 0.75);
-    float ms = distance / 0.5 * 1000;
+    float ms = distance / 0.3 * 1000;
     setMotors(DriveSpeed, DriveSpeed);
     delay((unsigned long)ms);
     stabilize();
