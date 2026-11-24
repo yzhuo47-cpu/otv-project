@@ -392,7 +392,8 @@ void moveServoByStep(Servo &servo, int target, int stepDegrees, int stepMs) {
       position = max(position - stepDegrees, target);
     }
 
-    servo.write(position);
+    //servo.write(position);
+    servo.write(target);
     delay(stepMs);
   }
 }
