@@ -243,7 +243,7 @@ void moveServo(Servo &s, int target) {
   while (pos != target) {
     pos += (target > pos) ? 1 : -1;
     s.write(pos);
-    delay(15);
+    delay(10);
   }
 }
 void compare() {
