@@ -1,0 +1,406 @@
+// The Harvesters - Seed Planting - MS6
+// Mission I   : back of the site, read the two far plots, send the pattern
+// Mission III : front of the site, collect at least 10 g of rocks from the near-right plot
+// Mission II (seed planting) is in its own file on GitHub.
+//
+// TESTING:
+//   1. Set MISSION to 3 to test rock collection, or 1 to test IR classification.
+//   2. Power the OTV OFF before changing the setting or uploading.
+//   3. Upload, unplug USB, place the OTV in the correct starting position, then power ON.
+//   4. Mission III starts with the bucket above the near-right (rock) plot unless
+//      BACK_UP_FIRST is set to true.
+//
+// IMPORTANT:
+//   Do NOT press RESET after Mission III. The servos may return to their startup
+//   positions and spill the collected rocks.
+//
+
+#include "Enes100.h"
+#include <Servo.h>
+#include <math.h>
+
+// ===================== SETTINGS =====================
+
+// 0 = IR live test: prints the IR number every ~0.7 seconds
+// 1 = Mission I   (OTV at the BACK of the site)
+// 3 = Mission III (OTV at the FRONT of the site)
+const int MISSION = 3;  // Set to 1 for Mission I; set to 3 to test scooping.
+
+const int MARKER_ID = 147;  // ArUco marker on top of the OTV
+const int ROOM = 1201;      // Arena room
+
+// Motor pins (L298N driver)
+const int ENA = 10, IN1 = 9, IN2 = 8;   // right side: enable + direction
+const int ENB = 5,  IN3 = 7, IN4 = 6;   // left side: enable + direction
+
+// Mission pins
+const int ARM_PIN = A1;     // Upper servo: lifts / lowers the arm
+const int BUCKET_PIN = A2;  // Lower servo: turns the bucket
+const int IR_PIN = A0;      // IR sensor (TCRT5000, analog AO pin)
+
+// Servo angles: keep these consistent with the tuned values in your Mission II file.
+const int ARM_UP = 75;        // Safe raised position
+const int ARM_DOWN = 102;     // Digging position
+const int BUCKET_HOLD = 90;   // Bucket level / startup position
+const int BUCKET_SCOOP = 150; // Scoop position
+
+// ---- Servo movement increments ----
+// Arm uses 5-degree increments so the lift commands advance faster.
+// Bucket uses 3-degree increments for more controlled bucket positioning.
+const int ARM_STEP_DEG = 5;
+const int BUCKET_STEP_DEG = 3;
+const int ARM_STEP_MS = 15;
+const int BUCKET_STEP_MS = 15;
+
+// ---- Mission III only ----
+const int BUCKET_CARRY = 160;       // Extra tilt after lifting to help retain rocks
+const int ROCK_SETTLE_MS = 800;     // Let rocks settle after scooping
+const bool BACK_UP_FIRST = false;   // false = start above near-right plot
+                                    // true  = start above near-left plot and back up one plot
+
+// ---- Mission I only ----
+const int ARM_IR_READ = ARM_UP;     // Must match the height used to calibrate IR values
+const float IR_THRESHOLD = 22.0;    // Below = orzo; above = rocks
+const float IR_CHECK_ZONE = 0.5;    // Near threshold: take additional scans
+const float IR_UNSURE_ZONE = 1.0;   // Near threshold: report UNSURE
+
+// ---- Backing up one plot ----
+const float PLOT_SPACING_CM = 8.4;              // Center-to-center distance between plots
+const int PULSE_FAR_MS = 200;                   // Longer pulse while far from target
+const int PULSE_NEAR_MS = 70;                   // Shorter pulse near target
+const float NEAR_CM = 2.0;
+const int PULSE_PAUSE_MS = 350;                // Wait for a fresh camera position
+const float BACKUP_TOL_CM = 0.3;
+const unsigned long BACKUP_TIMEOUT_MS = 40000;
+const int SETTLE_MS = 700;                      // Let arm stop swaying before reading/scooping
+
+// ====================================================
+
+// UNO R4 uses a 14-bit ADC. Convert readings back to the calibrated 10-bit scale.
+#if defined(ARDUINO_ARCH_RENESAS) || defined(ARDUINO_ARCH_RENESAS_UNO)
+  #define ADC_BITS 14
+#else
+  #define ADC_BITS 10
+#endif
+
+const float ADC_TO_10BIT = 1023.0 / ((1L << ADC_BITS) - 1);
+
+Servo arm;
+Servo bucket;
+
+// Forward declarations
+void motorsOff();
+void missionOne();
+void missionThree();
+void say(String msg);
+float readIR();
+float readPlot();
+bool isOrzo(float value);
+bool isUnsure(float value);
+bool backUp(float cm);
+bool readPosition(float &x, float &y);
+bool averagePosition(float &xa, float &ya);
+void driveBackward();
+void stopMotors();
+void moveServoByStep(Servo &servo, int target, int stepDegrees, int stepMs);
+
+void setup() {
+  motorsOff();  // Ensure motors cannot move during startup.
+
+#if ADC_BITS == 14
+  analogReadResolution(ADC_BITS);
+#endif
+
+  arm.attach(ARM_PIN);
+  bucket.attach(BUCKET_PIN);
+
+  arm.write(ARM_UP);
+  bucket.write(BUCKET_HOLD);
+
+  Enes100.begin("The Harvesters", SEED, MARKER_ID, ROOM);
+
+  while (!Enes100.isConnected()) {
+    delay(100);
+  }
+
+  say("Wi-Fi connected, starting in 3 s");
+  delay(3000);  // Take hands away before the mission begins.
+
+  if (MISSION == 1) {
+    missionOne();
+  } else if (MISSION == 3) {
+    missionThree();
+  } else if (MISSION != 0) {
+    say("ERROR: Set MISSION to 0, 1, or 3");
+  }
+}
+
+void loop() {
+  if (MISSION == 0) {
+    float value = readIR();
+    say("Live IR: " + String(value, 2) +
+        (isOrzo(value) ? " -> ORZO" : " -> ROCKS"));
+    delay(700);
+  }
+  // Missions 1 and 3 run once in setup().
+}
+
+// ================ MISSION I ================
+
+// Start with the OTV at the back of the site, right side facing the site,
+// and the IR sensor above the far plot toward the OTV's front.
+// From the back, the first plot is far-right.
+void missionOne() {
+  moveServoByStep(arm, ARM_IR_READ, ARM_STEP_DEG, ARM_STEP_MS);
+  delay(SETTLE_MS);
+
+  float rightIR = readPlot();  // Far-right plot
+
+  backUp(PLOT_SPACING_CM);     // IR should now be above the far-left plot
+  delay(SETTLE_MS);
+
+  float leftIR = readPlot();   // Far-left plot
+
+  bool farRight = isOrzo(rightIR);
+  bool farLeft = isOrzo(leftIR);
+
+  // Described from the seed plot (near-left, always orzo):
+  // ADJACENT = far-left; DIAGONAL = far-right.
+  int plot;
+  const char *name;
+
+  if (farLeft && farRight) {
+    plot = BOTH;
+    name = "BOTH";
+  } else if (farLeft) {
+    plot = ADJACENT;
+    name = "ADJACENT";
+  } else if (farRight) {
+    plot = DIAGONAL;
+    name = "DIAGONAL";
+  } else {
+    plot = NEITHER;
+    name = "NEITHER";
+  }
+
+  Enes100.mission(LOCATION, plot);
+  delay(300);
+
+  say(String("Mission I sent: ") + name);
+  say(String("far-left: ") + (farLeft ? "orzo" : "rocks") +
+      " (IR " + String(leftIR, 1) + ")" +
+      (isUnsure(leftIR) ? " UNSURE" : ""));
+  say(String("far-right: ") + (farRight ? "orzo" : "rocks") +
+      " (IR " + String(rightIR, 1) + ")" +
+      (isUnsure(rightIR) ? " UNSURE" : ""));
+
+  moveServoByStep(arm, ARM_UP, ARM_STEP_DEG, ARM_STEP_MS);
+}
+
+// ================ MISSION III ================
+
+// Start with the bucket above the middle of the near-right plot (rocks).
+// If BACK_UP_FIRST is true, start above near-left and back up one plot first.
+void missionThree() {
+  if (BACK_UP_FIRST) {
+    backUp(PLOT_SPACING_CM);
+  }
+
+  delay(SETTLE_MS);
+
+  // Lower the arm into the rocks using larger 5-degree command increments.
+  moveServoByStep(arm, ARM_DOWN, ARM_STEP_DEG, ARM_STEP_MS);
+  delay(300);
+
+  // Rotate bucket into the scoop position using 3-degree increments.
+  moveServoByStep(bucket, BUCKET_SCOOP, BUCKET_STEP_DEG, BUCKET_STEP_MS);
+  delay(ROCK_SETTLE_MS);
+
+  // Lift using 5-degree increments instead of the old 1-degree / 30-ms movement.
+  moveServoByStep(arm, ARM_UP, ARM_STEP_DEG, ARM_STEP_MS);
+  delay(500);
+
+  // Tilt the bucket farther only after the arm has cleared the plot.
+  moveServoByStep(bucket, BUCKET_CARRY, BUCKET_STEP_DEG, BUCKET_STEP_MS);
+
+  say("Mission III done: weigh the rocks (need 10 g)");
+}
+
+// ================ IR SENSOR ================
+
+// Take one scan; if it is close to the threshold, take up to 3 more
+// and return the average.
+float readPlot() {
+  float total = readIR();
+  int scans = 1;
+
+  while (scans < 4 && fabs(total / scans - IR_THRESHOLD) < IR_CHECK_ZONE) {
+    total += readIR();
+    scans++;
+  }
+
+  return total / scans;
+}
+
+// Average 50 analog samples over approximately 0.5 seconds.
+float readIR() {
+  long sum = 0;
+
+  for (int i = 0; i < 50; i++) {
+    sum += analogRead(IR_PIN);
+    delay(10);
+  }
+
+  return sum * ADC_TO_10BIT / 50.0;
+}
+
+// Orzo reads lower than rocks.
+bool isOrzo(float value) {
+  return value < IR_THRESHOLD;
+}
+
+bool isUnsure(float value) {
+  return fabs(value - IR_THRESHOLD) < IR_UNSURE_ZONE;
+}
+
+// ================ MOVEMENT ================
+
+// Back up a set distance in centimeters using the vision-system position.
+// The robot only drives when its marker is visible.
+bool backUp(float cm) {
+  float x0, y0;
+
+  if (!averagePosition(x0, y0)) {
+    say("backUp: marker not seen, not moving");
+    return false;
+  }
+
+  unsigned long start = millis();
+  float moved = 0;
+
+  while (millis() - start < BACKUP_TIMEOUT_MS) {
+    float x, y;
+
+    if (readPosition(x, y)) {
+      float dx = x - x0;
+      float dy = y - y0;
+      moved = sqrt(dx * dx + dy * dy) * 100.0;  // Convert meters to centimeters.
+
+      if (moved >= cm - BACKUP_TOL_CM) {
+        break;
+      }
+
+      driveBackward();
+      delay((cm - moved > NEAR_CM) ? PULSE_FAR_MS : PULSE_NEAR_MS);
+      stopMotors();
+    }
+
+    delay(PULSE_PAUSE_MS);
+  }
+
+  stopMotors();
+
+  say(String("backUp moved ") + String(moved, 1) +
+      " cm (wanted " + String(cm, 1) + ")");
+
+  return fabs(moved - cm) < 1.0;
+}
+
+// Latest camera position in meters. Returns false if marker is not visible.
+bool readPosition(float &x, float &y) {
+  if (!Enes100.isVisible()) {
+    return false;
+  }
+
+  x = Enes100.getX();
+  y = Enes100.getY();
+
+  return (x >= 0 && y >= 0);
+}
+
+// Average four camera readings to reduce position jitter.
+bool averagePosition(float &xa, float &ya) {
+  float sx = 0;
+  float sy = 0;
+  int count = 0;
+  unsigned long start = millis();
+
+  while (count < 4 && millis() - start < 5000) {
+    float x, y;
+
+    if (readPosition(x, y)) {
+      sx += x;
+      sy += y;
+      count++;
+      delay(260);
+    } else {
+      delay(50);
+    }
+  }
+
+  if (count == 0) {
+    return false;
+  }
+
+  xa = sx / count;
+  ya = sy / count;
+  return true;
+}
+
+// Both sides backward at full power. Swap HIGH/LOW on each pair if direction is reversed.
+void driveBackward() {
+  digitalWrite(IN1, LOW);
+  digitalWrite(IN2, HIGH);  // Right side backward
+
+  digitalWrite(IN3, LOW);
+  digitalWrite(IN4, HIGH);  // Left side backward
+
+  digitalWrite(ENA, HIGH);
+  digitalWrite(ENB, HIGH);
+}
+
+void stopMotors() {
+  digitalWrite(ENA, LOW);
+  digitalWrite(ENB, LOW);
+}
+
+// Set all motor pins as outputs and LOW.
+void motorsOff() {
+  const int pins[] = {ENA, IN1, IN2, ENB, IN3, IN4};
+
+  for (int i = 0; i < 6; i++) {
+    pinMode(pins[i], OUTPUT);
+    digitalWrite(pins[i], LOW);
+  }
+}
+
+// ================ SERVO HELPERS ================
+
+// Move toward a target by a specified number of degrees per command.
+// The final step is shortened when needed so the servo lands exactly on target.
+void moveServoByStep(Servo &servo, int target, int stepDegrees, int stepMs) {
+  if (stepDegrees < 1) {
+    stepDegrees = 1;
+  }
+
+  int position = servo.read();
+
+  while (position != target) {
+    if (target > position) {
+      position = min(position + stepDegrees, target);
+    } else {
+      position = max(position - stepDegrees, target);
+    }
+
+    servo.write(position);
+    delay(stepMs);
+  }
+}
+
+// ================ MESSAGES ================
+
+// Send a message to the ENES100 vision-system page.
+void say(String msg) {
+  Enes100.println(msg);
+  delay(300);
+}
